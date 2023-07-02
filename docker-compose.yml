@@ -1,0 +1,49 @@
+version: '3'
+services:
+  review-service-cassandra:
+    image: cassandra:4.1.2
+    container_name: review-service-cassandra
+    ports:
+      - 9042:9042
+    healthcheck:
+      test: [ "CMD", "cqlsh", "-u cassandra", "-p cassandra"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    environment:
+      - CASSANDRA_CLUSTER_NAME=datacenter1
+    networks:
+      - product-review-network
+
+  cassandra_temp:
+    image: cassandra:4.1.2
+    depends_on:
+      review-service-cassandra:
+        condition: service_healthy
+    volumes:
+      - ./scripts/bash:/docker-entrypoint.sh
+      - ./scripts/cql:/tmp/cql
+    networks:
+      - product-review-network
+    command: >
+      bash ./docker-entrypoint.sh/execute-cql.sh
+
+  review-service:
+    image: nshigarov/review-service:latest
+    container_name: review-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      review-service-cassandra:
+        condition: service_healthy
+    networks:
+      - product-review-network
+
+volumes:
+  cassandra_data:
+
+networks:
+  product-review-network:
+    external: true
